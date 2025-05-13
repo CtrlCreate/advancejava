@@ -1,0 +1,194 @@
+ Eclipse Project Structure:
+
+AcademicSystem/
+├── src/
+│   ├── rn023/
+│   │   ├── AtomicRegistrationApp.java       ← Main class
+│   │   └── DBUtil.java                      ← Database utility
+│   └── config.properties                    ← Database credentials
+
+========================================================================================================================
+✅ 2. Tables Required
+a) Student Table
+
+CREATE TABLE Student (
+    student_id INT PRIMARY KEY IDENTITY(1,1),
+    name VARCHAR(100) NOT NULL,
+    department VARCHAR(50) NOT NULL
+);
+
+b) Subject Table
+
+CREATE TABLE Subject (
+    subject_id INT PRIMARY KEY,
+    subject_name VARCHAR(100) NOT NULL
+);
+
+c) StudentSubject Table
+
+CREATE TABLE StudentSubject (
+    student_id INT,
+    subject_id INT,
+    PRIMARY KEY (student_id, subject_id),
+    FOREIGN KEY (student_id) REFERENCES Student(student_id),
+    FOREIGN KEY (subject_id) REFERENCES Subject(subject_id)
+);
+
+//
+. Notes
+Ensure Subject table has some predefined entries for valid subject_id like 101, 102, etc.
+
+For testing, insert subjects manually:
+
+INSERT INTO Subject (subject_id, subject_name) VALUES (101, 'Math'), (102, 'Physics');
+//
+======================================================================================================
+DBUtil.java:
+
+package rn023;
+
+import java.sql.*;
+import java.util.Properties;
+import java.io.FileInputStream;
+
+public class DBUtil {
+    private static Connection connection;
+
+    static {
+        try {
+            // Load properties from config file
+            Properties properties = new Properties();
+            properties.load(new FileInputStream("src/config.properties"));
+
+            String url = properties.getProperty("db.url");
+            String username = properties.getProperty("db.username");
+            String password = properties.getProperty("db.password");
+
+            // Establish the connection using the database specified in the config
+            connection = DriverManager.getConnection(url, username, password);
+            System.out.println("Connected to the database successfully!");
+        } catch (Exception e) {
+            System.err.println("Failed to connect to the database!");
+            e.printStackTrace();
+        }
+    }
+
+    public static Connection getConnection() {
+        return connection;
+    }
+}
+
+
+======================================================================================================================================
+✅ 3. Java Program Structure
+Assume the config is loaded from config.properties as in your previous setup.
+
+✨ Main Class: AtomicRegistrationApp.java
+
+package rn023;
+
+import java.sql.*;
+import java.util.*;
+
+public class AtomicRegistrationApp {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        Connection connection = null;
+
+        try {
+            // Step 1: Connect to DB and disable auto-commit
+            connection = DBUtil.getConnection();
+            connection.setAutoCommit(false);  // BEGIN TRANSACTION
+
+            // Step 2: Input Student Details
+            System.out.print("Enter Student Name: ");
+            String name = scanner.nextLine();
+            System.out.print("Enter Department: ");
+            String dept = scanner.nextLine();
+
+            String insertStudentSQL = "INSERT INTO Student (name, department) VALUES (?, ?)";
+            PreparedStatement studentStmt = connection.prepareStatement(insertStudentSQL, Statement.RETURN_GENERATED_KEYS);
+            studentStmt.setString(1, name);
+            studentStmt.setString(2, dept);
+            studentStmt.executeUpdate();
+
+            ResultSet rs = studentStmt.getGeneratedKeys();
+            int studentId = 0;
+            if (rs.next()) {
+                studentId = rs.getInt(1);
+                System.out.println("Student registered with ID: " + studentId);
+            }
+
+            // Step 3: Subject Allocation
+            System.out.print("Enter number of subjects to allocate: ");
+            int count = Integer.parseInt(scanner.nextLine());
+
+            String allocateSQL = "INSERT INTO StudentSubject (student_id, subject_id) VALUES (?, ?)";
+            PreparedStatement allocateStmt = connection.prepareStatement(allocateSQL);
+
+            for (int i = 0; i < count; i++) {
+                System.out.print("Enter subject ID to allocate: ");
+                int subId = Integer.parseInt(scanner.nextLine());
+                allocateStmt.setInt(1, studentId);
+                allocateStmt.setInt(2, subId);
+                allocateStmt.executeUpdate();  // Could throw FK or PK error
+            }
+
+            // Step 4: Commit
+            connection.commit();  // COMMIT TRANSACTION
+            System.out.println("Student and subject allocation completed successfully!");
+
+        } catch (Exception e) {
+            System.err.println("Error occurred! Rolling back transaction.");
+            e.printStackTrace();
+            try {
+                if (connection != null) connection.rollback();  // ROLLBACK TRANSACTION
+                System.out.println("Transaction rolled back.");
+            } catch (SQLException rollbackEx) {
+                System.err.println("Error during rollback!");
+                rollbackEx.printStackTrace();
+            }
+        } finally {
+            try {
+                if (connection != null) connection.setAutoCommit(true);  // Restore default
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+======================================================================================================================================
+✅ 4.  config.properties
+
+db.url=jdbc:sqlserver://172.16.51.64;databaseName=241047023;encrypt=true;trustServerCertificate=true
+db.name=241047023
+db.username=manoj
+db.password=Man@23
+======================================================================================================================================
+ 4. Dependencies
+Ensure your Eclipse project includes the SQL Server JDBC driver (mssql-jdbc-<version>.jar) in your classpath:
+
+Download: https://learn.microsoft.com/en-us/sql/connect/jdbc/download-microsoft-jdbc-driver-for-sql-server
+
+Add to project via:
+
+Right-click project → Build Path → Configure Build Path → Libraries → Add External JARs
+========================================================================================================================================
+✅ 5. Sample Inputs and Outputs
+🟢 Input Example:
+
+Enter Student Name: John Doe
+Enter Department: CSE
+Student registered with ID: 1001
+Enter number of subjects to allocate: 2
+Enter subject ID to allocate: 101
+Enter subject ID to allocate: 999  ← (Invalid subject ID)
+
+🔴 Output:
+
+Student registered with ID: 1001
+Error occurred! Rolling back transaction.
+com.microsoft.sqlserver.jdbc.SQLServerException: The INSERT statement conflicted with the FOREIGN KEY constraint ...
+Transaction rolled back.
+
+============================================================================================================================================
