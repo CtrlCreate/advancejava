@@ -1,0 +1,227 @@
+project stucure:
+  
+SQLInjectionDemoProject
+│
+├── src
+│   ├── rn023
+│   │   ├── DBUtil.java  (Connection Utility Code)
+│   │   ├── VulnerableApp.java  (SQL Injection Vulnerable Code)
+│   │   ├── SecureApp.java  (SQL Injection Prevention Code)
+│   ├── config.properties  (Database Config File)
+│
+└── lib
+    └── sqljdbc4.jar (JDBC driver for SQL Server)
+
+
+
+
+=========================================================================================================================================
+
+Steps to Set Up the Project:
+  
+1)Create a New Java Project:
+  
+Open Eclipse and create a new Java project named SQLInjectionDemoProject.
+==================================================================================================================================
+2)Add JDBC Driver:
+Download the Microsoft JDBC Driver for SQL Server (sqljdbc4.jar) from the Microsoft website and add it to your project:
+
+Right-click on your project > Build Path > Add External Archives.
+
+Add the downloaded sqljdbc4.jar file.
+=======================================================================================================================================
+3)Create a config.properties File:
+Place this file in the src folder (as per the code above). It contains the database connection parameters.
+
+config.properties:
+
+db.url=jdbc:sqlserver://172.16.51.64;databaseName=241047023;encrypt=true;trustServerCertificate=true
+db.name=241047023
+db.username=manoj
+db.password=Man@23
+=============================================================================================================================================
+  
+4)Create the DBUtil.java File:
+
+package rn023;
+
+import java.sql.*;
+import java.util.Properties;
+import java.io.FileInputStream;
+
+public class DBUtil {
+    private static Connection connection;
+
+    static {
+        try {
+            // Load properties from config file
+            Properties properties = new Properties();
+            properties.load(new FileInputStream("src/config.properties"));
+
+            String url = properties.getProperty("db.url");
+            String username = properties.getProperty("db.username");
+            String password = properties.getProperty("db.password");
+
+            // Establish the connection using the database specified in the config
+            connection = DriverManager.getConnection(url, username, password);
+            System.out.println("Connected to the database successfully!");
+
+            // Initialize tables in the specified database
+            initializeDatabase();
+        } catch (Exception e) {
+            System.err.println("Failed to connect to the database!");
+            e.printStackTrace();
+        }
+    }
+
+    private static void initializeDatabase() {
+        try (Statement statement = connection.createStatement()) {
+            // Create ProductCatalog table if not exists
+            String createProductTable = """
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'ProductCatalog' AND xtype = 'U')
+                CREATE TABLE ProductCatalog (
+                    product_id INT IDENTITY(1,1) PRIMARY KEY,
+                    name VARCHAR(50) NOT NULL,
+                    category VARCHAR(50) NOT NULL,
+                    unit_price DECIMAL(10, 2) NOT NULL,
+                    available_quantity INT NOT NULL
+                );
+            """;
+            statement.executeUpdate(createProductTable);
+
+            // Create SaleTransaction table if not exists
+            String createSaleTable = """
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'SaleTransaction' AND xtype = 'U')
+                CREATE TABLE SaleTransaction (
+                    transaction_id INT IDENTITY(1,1) PRIMARY KEY,
+                    customer_name VARCHAR(50) NOT NULL,
+                    product_id INT,
+                    sale_quantity INT NOT NULL,
+                    sale_price DECIMAL(10, 2) NOT NULL,
+                    FOREIGN KEY (product_id) REFERENCES ProductCatalog(product_id)
+                );
+            """;
+            statement.executeUpdate(createSaleTable);
+
+            System.out.println("Tables initialized successfully!");
+        } catch (SQLException e) {
+            System.err.println("Error while initializing the database!");
+            e.printStackTrace();
+        }
+    }
+
+    public static Connection getConnection() {
+        return connection;
+    }
+}
+===========================================================================================================
+5)Create the VulnerableApp.java and SecureApp.java Files:
+These files will handle the SQL injection and prevention demonstration.
+
+      VulnerableApp.java:
+
+package rn023;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class VulnerableApp {
+    public static void main(String[] args) {
+        // Get the database connection
+        try (Connection connection = DBUtil.getConnection()) {
+            // Ask for user input
+            Scanner scanner = new Scanner(System.in);
+            System.out.print("Enter product name: ");
+            String productName = scanner.nextLine();
+            System.out.print("Enter product quantity: ");
+            int quantity = scanner.nextInt();
+            System.out.print("Enter product price: ");
+            double price = scanner.nextDouble();
+
+            // Construct vulnerable SQL query with user input
+            String query = "INSERT INTO ProductCatalog (name, category, unit_price, available_quantity) " +
+                           "VALUES ('" + productName + "', 'Category1', " + price + ", " + quantity + ");";
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate(query);  // This is vulnerable to SQL Injection
+                System.out.println("Product added to the database.");
+            } catch (SQLException e) {
+                System.err.println("Error inserting data: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+input :
+'Apple'); DROP TABLE ProductCatalog; --
+
+output:
+INSERT INTO ProductCatalog (name, category, unit_price, available_quantity)
+VALUES ('Apple'); DROP TABLE ProductCatalog; --', 'Category1', 100, 20);
+==========================================================================================================================================
+
+SecureApp.java:
+
+package rn023;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class SecureApp {
+    public static void main(String[] args) {
+        // Get the database connection
+        try (Connection connection = DBUtil.getConnection()) {
+            // Ask for user input
+            Scanner scanner = new Scanner(System.in);
+            System.out.print("Enter product name: ");
+            String productName = scanner.nextLine();
+            System.out.print("Enter product quantity: ");
+            int quantity = scanner.nextInt();
+            System.out.print("Enter product price: ");
+            double price = scanner.nextDouble();
+
+            // Use PreparedStatement to safely insert data
+            String query = "INSERT INTO ProductCatalog (name, category, unit_price, available_quantity) " +
+                           "VALUES (?, 'Category1', ?, ?)";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, productName);
+                stmt.setDouble(2, price);
+                stmt.setInt(3, quantity);
+                stmt.executeUpdate();  // This is secure
+                System.out.println("Product added to the database securely.");
+            } catch (SQLException e) {
+                System.err.println("Error inserting data: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+input:
+'Apple'); DROP TABLE ProductCatalog; --
+
+=============================================================================================================================
+
+5)Testing the Application
+a)Vulnerable Test (SQL Injection):
+
+Run the VulnerableApp.java.
+
+Enter the malicious string as input for product name (e.g., 'Apple'); DROP TABLE ProductCatalog; --).
+
+The table will be deleted, and you will observe the effect in the database.
+  
+
+b)Secure Test (PreparedStatement):
+
+Run the SecureApp.java.
+
+Enter the same malicious string for product name.
+
+The ProductCatalog table will not be affected, and the product will be added securely.
+
+
