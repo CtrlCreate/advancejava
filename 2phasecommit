@@ -1,0 +1,163 @@
+✅ Database Setup
+
+⚙️ Create Two Databases
+
+On DB1 (academic_db1)
+
+CREATE TABLE Student (
+    student_id INT PRIMARY KEY,
+    name VARCHAR(100)
+);
+
+On DB2 (academic_db2)
+
+CREATE TABLE SubjectAllocation (
+    allocation_id INT PRIMARY KEY,
+    student_id INT,
+    subject_name VARCHAR(100)
+);
+=====================================================================================================================
+✅ Java Project Structure
+
+TwoPhaseCommitDemo/
+├── src/
+│   ├── rn023/
+│   │   ├── DBUtil1.java
+│   │   ├── DBUtil2.java
+│   │   └── TwoPhaseCommitApp.java
+│   └── config1.properties
+│   └── config2.properties
+├── lib/
+│   └── mssql-jdbc-12.2.0.jre8.jar
+============================================================================================
+✅ 1. config1.properties (DB1)
+
+db.url=jdbc:sqlserver://172.16.51.64;databaseName=241047023;encrypt=true;trustServerCertificate=true
+db.name=241047023
+db.username=manoj
+db.password=Man@23
+
+
+✅ 2. config2.properties (DB2)
+
+db.url=jdbc:sqlserver://172.16.51.64;databaseName=241047023;encrypt=true;trustServerCertificate=true
+db.name=241047023
+db.username=manoj
+db.password=Man@23
+========================================================================================================================
+✅ 3. DB Connection Utils
+
+a) DBUtil1.java
+
+package rn023;
+
+import java.sql.*;
+import java.io.FileInputStream;
+import java.util.Properties;
+
+public class DBUtil1 {
+    public static Connection getConnection() throws Exception {
+        Properties props = new Properties();
+        props.load(new FileInputStream("src/config1.properties"));
+        return DriverManager.getConnection(
+            props.getProperty("db.url"),
+            props.getProperty("db.username"),
+            props.getProperty("db.password"));
+    }
+}
+
+
+b) DBUtil2.java
+
+package rn023;
+
+import java.sql.*;
+import java.io.FileInputStream;
+import java.util.Properties;
+
+public class DBUtil2 {
+    public static Connection getConnection() throws Exception {
+        Properties props = new Properties();
+        props.load(new FileInputStream("src/config2.properties"));
+        return DriverManager.getConnection(
+            props.getProperty("db.url"),
+            props.getProperty("db.username"),
+            props.getProperty("db.password"));
+    }
+}
+
+======================================================================================================
+✅ 4. Main Logic: TwoPhaseCommitApp.java
+
+package rn023;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class TwoPhaseCommitApp {
+    public static void main(String[] args) {
+        Connection conn1 = null;
+        Connection conn2 = null;
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            conn1 = DBUtil1.getConnection();
+            conn2 = DBUtil2.getConnection();
+
+            conn1.setAutoCommit(false);  // Begin transaction DB1
+            conn2.setAutoCommit(false);  // Begin transaction DB2
+
+            // Input from user
+            System.out.print("Enter Student ID: ");
+            int sid = Integer.parseInt(scanner.nextLine());
+
+            System.out.print("Enter Student Name: ");
+            String name = scanner.nextLine();
+
+            System.out.print("Enter Subject Name: ");
+            String subject = scanner.nextLine();
+
+            // Insert into DB1 - Student
+            PreparedStatement ps1 = conn1.prepareStatement("INSERT INTO Student (student_id, name) VALUES (?, ?)");
+            ps1.setInt(1, sid);
+            ps1.setString(2, name);
+            ps1.executeUpdate();
+
+            // Insert into DB2 - SubjectAllocation
+            PreparedStatement ps2 = conn2.prepareStatement("INSERT INTO SubjectAllocation (allocation_id, student_id, subject_name) VALUES (?, ?, ?)");
+            ps2.setInt(1, sid);  // allocation_id = student_id for simplicity
+            ps2.setInt(2, sid);
+            ps2.setString(3, subject);
+            ps2.executeUpdate();
+
+            // Simulate 2PC - Phase 2
+            conn1.commit();
+            conn2.commit();
+            System.out.println("Transaction committed on both databases.");
+
+        } catch (Exception e) {
+            System.err.println("Error occurred, rolling back both DB transactions.");
+            e.printStackTrace();
+            try {
+                if (conn1 != null) conn1.rollback();
+                if (conn2 != null) conn2.rollback();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        } finally {
+            try {
+                if (conn1 != null) conn1.setAutoCommit(true);
+                if (conn2 != null) conn2.setAutoCommit(true);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+========================================================================================================
+✅ Sample Output
+
+Enter Student ID: 1
+Enter Student Name: Manoj
+Enter Subject Name: Math
+Transaction committed on both databases.
