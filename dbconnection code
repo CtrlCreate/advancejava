@@ -20,47 +20,8 @@ public class DBUtil {
             // Establish the connection using the database specified in the config
             connection = DriverManager.getConnection(url, username, password);
             System.out.println("Connected to the database successfully!");
-
-            // Initialize tables in the specified database
-            initializeDatabase();
         } catch (Exception e) {
             System.err.println("Failed to connect to the database!");
-            e.printStackTrace();
-        }
-    }
-
-    private static void initializeDatabase() {
-        try (Statement statement = connection.createStatement()) {
-            // Create ProductCatalog table if not exists
-            String createProductTable = """
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'ProductCatalog' AND xtype = 'U')
-                CREATE TABLE ProductCatalog (
-                    product_id INT IDENTITY(1,1) PRIMARY KEY,
-                    name VARCHAR(50) NOT NULL,
-                    category VARCHAR(50) NOT NULL,
-                    unit_price DECIMAL(10, 2) NOT NULL,
-                    available_quantity INT NOT NULL
-                );
-            """;
-            statement.executeUpdate(createProductTable);
-
-            // Create SaleTransaction table if not exists
-            String createSaleTable = """
-                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'SaleTransaction' AND xtype = 'U')
-                CREATE TABLE SaleTransaction (
-                    transaction_id INT IDENTITY(1,1) PRIMARY KEY,
-                    customer_name VARCHAR(50) NOT NULL,
-                    product_id INT,
-                    sale_quantity INT NOT NULL,
-                    sale_price DECIMAL(10, 2) NOT NULL,
-                    FOREIGN KEY (product_id) REFERENCES ProductCatalog(product_id)
-                );
-            """;
-            statement.executeUpdate(createSaleTable);
-
-            System.out.println("Tables initialized successfully!");
-        } catch (SQLException e) {
-            System.err.println("Error while initializing the database!");
             e.printStackTrace();
         }
     }
@@ -69,6 +30,7 @@ public class DBUtil {
         return connection;
     }
 }
+
 
 
 
