@@ -1,0 +1,155 @@
+✅ 2. Database Schema
+
+a) Customer Table
+
+CREATE TABLE Customer (
+    customer_id INT PRIMARY KEY,
+    name VARCHAR(100)
+);
+
+b) SaleTransaction Table
+
+CREATE TABLE SaleTransaction (
+    transaction_id INT PRIMARY KEY,
+    customer_id INT,
+    amount DECIMAL(10,2),
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)
+);
+
+✅ 3. Creating the Stored Procedure
+This procedure computes the total amount spent by each customer.
+
+
+CREATE PROCEDURE GetTotalSpentPerCustomer
+AS
+BEGIN
+    SELECT 
+        c.customer_id,
+        c.name,
+        SUM(s.amount) AS total_spent
+    FROM 
+        Customer c
+    JOIN 
+        SaleTransaction s ON c.customer_id = s.customer_id
+    GROUP BY 
+        c.customer_id, c.name;
+END;
+
+==============================================================================================================================
+✅ 4. Verifying It Works (Manual Test)
+Insert test data:
+
+INSERT INTO Customer VALUES (1, 'Alice'), (2, 'Bob');
+INSERT INTO SaleTransaction VALUES 
+(1001, 1, 150.00),
+(1002, 1, 200.00),
+(1003, 2, 50.00);
+
+-- Run the stored procedure
+EXEC GetTotalSpentPerCustomer;
+Expected Output:
+customer_id	name	total_spent
+1	Alice	350.00
+2	Bob	50.00
+
+✅ Verified.
+
+====================================================================================================================================
+
+✅ 5. Java Code to Call the Stored Procedure
+a) DBUtil.java 
+
+package rn023;
+
+import java.sql.*;
+import java.util.Properties;
+import java.io.FileInputStream;
+
+public class DBUtil {
+    private static Connection connection;
+
+    static {
+        try {
+            // Load properties from config file
+            Properties properties = new Properties();
+            properties.load(new FileInputStream("src/config.properties"));
+
+            String url = properties.getProperty("db.url");
+            String username = properties.getProperty("db.username");
+            String password = properties.getProperty("db.password");
+
+            // Establish the connection using the database specified in the config
+            connection = DriverManager.getConnection(url, username, password);
+            System.out.println("Connected to the database successfully!");
+        } catch (Exception e) {
+            System.err.println("Failed to connect to the database!");
+            e.printStackTrace();
+        }
+    }
+
+    public static Connection getConnection() {
+        return connection;
+    }
+}
+
+config.properties:
+
+db.url=jdbc:sqlserver://172.16.51.64;databaseName=241047023;encrypt=true;trustServerCertificate=true
+db.name=241047023
+db.username=manoj
+db.password=Man@23
+
+
+
+
+
+b) StoredProcedureCaller.java
+
+package rn023;
+
+import java.sql.*;
+
+public class StoredProcedureCaller {
+    public static void main(String[] args) {
+        try (Connection conn = DBUtil.getConnection()) {
+            CallableStatement stmt = conn.prepareCall("{CALL GetTotalSpentPerCustomer}");
+
+            ResultSet rs = stmt.executeQuery();
+
+            System.out.println("Customer-wise Total Spending:");
+            System.out.printf("%-10s %-15s %-10s%n", "ID", "Name", "Total");
+
+            while (rs.next()) {
+                int id = rs.getInt("customer_id");
+                String name = rs.getString("name");
+                double total = rs.getDouble("total_spent");
+
+                System.out.printf("%-10d %-15s %-10.2f%n", id, name, total);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error calling stored procedure:");
+            e.printStackTrace();
+        }
+    }
+}
+
+=======================================================================
+✅ 6. Eclipse Project Structure
+
+StoredProcedureDemo/
+├── src/
+│   ├── rn023/
+│   │   ├── DBUtil.java
+│   │   └── StoredProcedureCaller.java
+│   └── config.properties
+├── lib/
+│   └── mssql-jdbc-12.2.0.jre8.jar
+
+==============================================================================================
+✅ 7. Sample Output
+
+Connected to the database successfully!
+Customer-wise Total Spending:
+ID         Name            Total     
+1          Alice           350.00    
+2          Bob             50.00
