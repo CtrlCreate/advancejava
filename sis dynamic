@@ -1,0 +1,247 @@
+📂 Directory Structure (Maven or Dynamic Web Project)
+
+SISWebApp/
+├── src/
+│   └── com/sis/
+│       ├── servlet/
+│       │   ├── StudentServlet.java           ← Handles event registration
+│       │   └── ESERegisterServlet.java       ← Handles ESE registration
+│       └── util/
+│           └── DBConnection.java             ← Handles SQL Server DB connection
+│
+├── WebContent/ or src/main/webapp/
+│   ├── index.html                            ← Web UI (both forms)
+│   ├── ese_success.html                      ← Success page
+│   └── WEB-INF/
+│       └── web.xml                           ← Servlet mappings
+│
+├── lib/ (if not using Maven)
+│   └── sqljdbc42.jar                         ← SQL Server JDBC driver
+│
+└── pom.xml (if Maven)
+
+==========================================================================================================
+✅ Database Setup (SQL Server)
+Table: studentdetail
+
+
+CREATE TABLE studentdetail (
+    student_id INT PRIMARY KEY,
+    name VARCHAR(100),
+    gpa FLOAT,
+    attendance_percentage FLOAT
+);
+⚠ Ensure the student_id used in testing exists in this table with valid GPA and attendance values.
+
+==============================================================================================================
+
+📁 1. StudentServlet.java
+📍 Path: src/com/sis/servlet/StudentServlet.java
+🔍 Function: Handles Event Registration (checks GPA)
+
+
+package com.sis.servlet;
+
+import com.sis.util.DBConnection;
+import java.io.IOException;
+import java.sql.*;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.*;
+
+public class StudentServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        String studentId = request.getParameter("studentId");
+        try (Connection conn = DBConnection.getConnection()) {
+            PreparedStatement ps = conn.prepareStatement("SELECT gpa FROM studentdetail WHERE student_id = ?");
+            ps.setString(1, studentId);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                double gpa = rs.getDouble("gpa");
+                if (gpa > 7) {
+                    response.sendRedirect("ese_success.html");
+                } else {
+                    response.getWriter().println("GPA too low for event registration.");
+                }
+            } else {
+                response.getWriter().println("Student ID not found.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.getWriter().println("Error: " + e.getMessage());
+        }
+    }
+}
+
+
+📁 2. ESERegisterServlet.java
+📍 Path: src/com/sis/servlet/ESERegisterServlet.java
+🔍 Function: Handles ESE Registration (checks Attendance)
+
+
+package com.sis.servlet;
+
+import com.sis.util.DBConnection;
+import java.io.IOException;
+import java.sql.*;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.*;
+
+public class ESERegisterServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        String studentId = request.getParameter("studentId");
+        try (Connection conn = DBConnection.getConnection()) {
+            PreparedStatement ps = conn.prepareStatement("SELECT attendance_percentage FROM studentdetail WHERE student_id = ?");
+            ps.setString(1, studentId);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                int attendance = rs.getInt("attendance_percentage");
+                if (attendance > 75) {
+                    response.sendRedirect("ese_success.html");
+                } else {
+                    response.getWriter().println("Attendance too low for ESE registration.");
+                }
+            } else {
+                response.getWriter().println("Student ID not found.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.getWriter().println("Error: " + e.getMessage());
+        }
+    }
+}
+📁 3. DBConnection.java
+📍 Path: src/com/sis/util/DBConnection.java
+🔍 Function: Creates a connection to the SQL Server database
+
+
+package com.sis.util;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DBConnection {
+    private static final String URL = "jdbc:sqlserver://172.16.51.64;databaseName=241047010;encrypt=true;trustServerCertificate=true";
+    private static final String USER = "megharaj";
+    private static final String PASS = "Meg@10";
+
+    static {
+        try {
+            Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASS);
+    }
+}
+
+📄 4. index.html
+📍 Path: WebContent/index.html
+🔍 Function: Home page with forms for both registrations
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SIS Web Portal</title>
+</head>
+<body>
+    <h2>Event Registration (SIS)</h2>
+    <form action="StudentServlet" method="get">
+        Student ID: <input type="text" name="studentId" required>
+        <input type="submit" value="Register for Event">
+    </form>
+
+    <h2>ESE Registration</h2>
+    <form action="ESERegisterServlet" method="get">
+        Student ID: <input type="text" name="studentId" required>
+        <input type="submit" value="Register for ESE">
+    </form>
+</body>
+</html>
+
+📄 5. ese_success.html
+📍 Path: WebContent/ese_success.html
+🔍 Function: Shown when a student successfully registers
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Success</title>
+</head>
+<body>
+    <h2>Registration Successful!</h2>
+</body>
+</html>
+
+📄 6. web.xml
+📍 Path: WebContent/WEB-INF/web.xml
+🔍 Function: Servlet mapping configuration
+
+
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="5.0">
+
+  <servlet>
+    <servlet-name>StudentServlet</servlet-name>
+    <servlet-class>com.sis.servlet.StudentServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>StudentServlet</servlet-name>
+    <url-pattern>/StudentServlet</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>ESERegisterServlet</servlet-name>
+    <servlet-class>com.sis.servlet.ESERegisterServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ESERegisterServlet</servlet-name>
+    <url-pattern>/ESERegisterServlet</url-pattern>
+  </servlet-mapping>
+
+</web-app>
+
+=============================================================================================================
+✅ What You Need to Do in Eclipse
+
+Create a Dynamic Web Project named SISWebApp.
+
+Create packages:
+
+com.sis.servlet
+
+com.sis.util
+
+Paste each Java file in its correct package.
+
+Place index.html and ese_success.html inside WebContent/.
+
+Place web.xml inside WebContent/WEB-INF/.
+
+Add sqljdbc42.jar to WEB-INF/lib/ and build path.
+
+Deploy to Tomcat 10.1+ and test.
+======================================================================================================================
+
+✅ Fix: Add jakarta.servlet-api-5.0.0.jar Manually
+
+🔹 Step-by-Step:
+
+1. ✅ Download the JAR
+From official Maven Repo:
+Download jakarta.servlet-api-5.0.0.jar
+
+2. ✅ Place It in Your Project
+Copy jakarta.servlet-api-5.0.0.jar to:
+
+WebContent/WEB-INF/lib/
