@@ -1,0 +1,138 @@
+🔧 Prerequisites
+✅ MongoDB Server installed and running (localhost:27017)
+
+✅ MongoDB Compass (optional for GUI)
+
+✅ Eclipse IDE for Enterprise Java Developers
+
+✅ JDK 8+
+
+✅ Maven installed in Eclipse
+============================================================================================================
+
+✅ Step 1: Install Required Tools
+MongoDB Server: https://www.mongodb.com/try/download/community
+
+MongoDB Compass (GUI Dashboard): https://www.mongodb.com/try/download/compass
+
+MongoDB Shell (mongosh): https://www.mongodb.com/try/download/shell
+
+After installation, MongoDB runs by default on mongodb://localhost:27017
+
+✅ Step 2: Create Maven Java Project
+Project Structure:
+
+
+MongoDBJavaApp/
+├── src/
+│   └── main/
+│       └── java/
+│           └── com/example/
+│               └── MongoApp.java
+├── pom.xml
+
+=========================================================================================================================
+📦 Step-by-Step: Creating the Project in Eclipse
+
+✅ Step 1: Create Maven Project
+Open Eclipse
+
+Go to:
+File → New → Maven Project
+
+Check Create a simple project → Next
+
+Fill:
+
+Group Id: com.example
+
+Artifact Id: MongoDBJavaApp
+
+Packaging: jar
+
+Version: keep default
+
+Finish
+
+✅ Step 2: Add MongoDB Dependency
+Open pom.xml and paste:
+
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>MongoDBJavaApp</artifactId>
+  <version>1.0</version>
+
+  <dependencies>
+    <!-- MongoDB Java Driver -->
+    <dependency>
+      <groupId>org.mongodb</groupId>
+      <artifactId>mongodb-driver-sync</artifactId>
+      <version>4.11.0</version>
+    </dependency>
+  </dependencies>
+</project>
+Then:
+
+Right-click the project → Maven → Update Project (to download the MongoDB driver)
+
+
+✅ Step 3: Create Java Package and Class
+Right-click src/main/java → New > Package → Name: com.example
+
+Right-click com.example → New > Class → Name: MongoApp
+Check: public static void main(String[] args)
+
+✅ Step 4: Paste Java Code
+Inside MongoApp.java, paste:
+
+
+package com.example;
+
+import com.mongodb.client.*;
+import org.bson.Document;
+
+public class MongoApp {
+    public static void main(String[] args) {
+        try (MongoClient mongoClient = MongoClients.create("mongodb://localhost:27017")) {
+            System.out.println("Connected to MongoDB!");
+
+            MongoDatabase db = mongoClient.getDatabase("school");
+            MongoCollection<Document> collection = db.getCollection("students");
+
+            Document student = new Document("name", "Manoj R B")
+                    .append("regno", "241047023")
+                    .append("department", "CSE")
+                    .append("marks", 89);
+
+            collection.insertOne(student);
+            System.out.println("Document inserted.");
+
+            Document result = collection.find(new Document("regno", "241047023")).first();
+            System.out.println("Found: " + result.toJson());
+
+            collection.updateOne(new Document("regno", "241047023"),
+                    new Document("$set", new Document("marks", 95)));
+            System.out.println("Document updated.");
+
+            collection.deleteOne(new Document("regno", "241047023"));
+            System.out.println("Document deleted.");
+        }
+    }
+}
+  
+✅ Step 5: Run the Application
+Right-click on MongoApp.java → Run As → Java Application
+
+✅ Expected Output:
+
+Connected to MongoDB!
+Document inserted.
+Found: { "_id": "...", "name": "Manoj R B", "regno": "241047023", ... }
+Document updated.
+Document deleted.
